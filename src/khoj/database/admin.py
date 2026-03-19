@@ -269,8 +269,9 @@ class SearchModelConfigAdmin(unfold_admin.ModelAdmin):
         "name",
         "bi_encoder",
         "cross_encoder",
+        "embeddings_batch_size",
     )
-    search_fields = ("id", "name", "bi_encoder", "cross_encoder")
+    search_fields = ("id", "name", "bi_encoder", "cross_encoder", "embeddings_batch_size")
 
 
 @admin.register(ServerChatSettings)

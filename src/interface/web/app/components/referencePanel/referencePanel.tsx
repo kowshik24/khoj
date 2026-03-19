@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { ArrowCircleDown, ArrowRight, Code, Note } from "@phosphor-icons/react";
+import { ArrowCircleDown, ArrowRight, Code, Note, Copy, Check } from "@phosphor-icons/react";
 
 import markdownIt from "markdown-it";
 const md = new markdownIt({
@@ -32,6 +32,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import DOMPurify from "dompurify";
 import { getIconFromFilename } from "@/app/common/iconUtils";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 interface NotesContextReferenceData {
     title: string;
@@ -585,6 +586,7 @@ interface ReferencePanelDataProps {
 
 export default function ReferencePanel(props: ReferencePanelDataProps) {
     const [numTeaserSlots, setNumTeaserSlots] = useState(3);
+    const [copySuccess, setCopySuccess] = useState<boolean>(false);
 
     useEffect(() => {
         setNumTeaserSlots(props.isMobileWidth ? 3 : 5);
@@ -605,6 +607,47 @@ export default function ReferencePanel(props: ReferencePanelDataProps) {
                   .filter((online) => online.link)
                   .slice(0, numTeaserSlots - codeDataToShow.length - notesDataToShow.length)
             : [];
+
+    const copyReferencesToClipboard = async () => {
+        const references: string[] = [];
+
+        // Add online references (web pages)
+        props.onlineReferenceCardData.forEach((online) => {
+            if (online.link && online.title && online.title.trim()) {
+                // Escape special characters in markdown links
+                const escapedTitle = online.title.replace(/[[\]()]/g, '\\$&');
+                references.push(`- [${escapedTitle}](${online.link})`);
+            }
+        });
+
+        // Add notes references (file paths)
+        props.notesReferenceCardData.forEach((note) => {
+            if (note.title && note.title.trim()) {
+                // Escape special characters in markdown links
+                const escapedTitle = note.title.replace(/[[\]()]/g, '\\$&');
+                references.push(`- [${escapedTitle}](file://${note.title})`);
+            }
+        });
+
+        // Add code references (file paths)
+        props.codeReferenceCardData.forEach((code) => {
+            // For code references, we'll use a generic title since we don't have specific file paths
+            const codePreview = code.code.substring(0, 50).trim();
+            if (codePreview) {
+                references.push(`- [Code Reference](code://${codePreview}...)`);
+            }
+        });
+
+        const markdownText = references.join('\n');
+        
+        try {
+            await navigator.clipboard.writeText(markdownText);
+            setCopySuccess(true);
+            setTimeout(() => setCopySuccess(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy references:', err);
+        }
+    };
 
     return (
         <Sheet>
@@ -642,6 +685,30 @@ export default function ReferencePanel(props: ReferencePanelDataProps) {
                 <SheetHeader>
                     <SheetTitle>References</SheetTitle>
                     <SheetDescription>View all references for this response</SheetDescription>
+                    {(props.onlineReferenceCardData.length > 0 || 
+                      props.notesReferenceCardData.length > 0 || 
+                      props.codeReferenceCardData.length > 0) && (
+                        <div className="flex justify-end mt-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={copyReferencesToClipboard}
+                                className="flex items-center gap-2"
+                            >
+                                {copySuccess ? (
+                                    <>
+                                        <Check className="w-4 h-4" />
+                                        Copied!
+                                    </>
+                                ) : (
+                                    <>
+                                        <Copy className="w-4 h-4" />
+                                        Copy References
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
                 </SheetHeader>
                 <div className="flex flex-wrap gap-2 w-auto mt-2">
                     {props.codeReferenceCardData.map((code, index) => {

@@ -537,6 +537,9 @@ class SearchModelConfig(DbBaseModel):
     embeddings_inference_endpoint_type = models.CharField(
         max_length=200, choices=ApiType.choices, default=ApiType.LOCAL
     )
+    # Max number of documents to send per embeddings API request.
+    # If unset, Khoj falls back to the KHOJ_EMBEDDINGS_BATCH_SIZE environment variable, then 1000.
+    embeddings_batch_size = models.PositiveIntegerField(default=None, null=True, blank=True)
     # Inference server API endpoint to use for embeddings inference. Cross-encoder model should be hosted on this server
     cross_encoder_inference_endpoint = models.CharField(max_length=200, default=None, null=True, blank=True)
     # Inference server API Key to use for embeddings inference. Cross-encoder model should be hosted on this server

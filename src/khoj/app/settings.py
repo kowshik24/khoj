@@ -121,7 +121,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 20000
 # Default PostgreSQL configuration
 DB_NAME = os.getenv("POSTGRES_DB", "khoj")
 DB_HOST = os.getenv("POSTGRES_HOST", "localhost")
-DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+DB_PORT = os.getenv("POSTGRES_PORT", "5433")
 
 # Use pgserver if env var explicitly set to true
 USE_EMBEDDED_DB = is_env_var_true("USE_EMBEDDED_DB")

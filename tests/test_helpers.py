@@ -6,6 +6,7 @@ import psutil
 import pytest
 from scipy.stats import linregress
 
+from khoj.database.models import SearchModelConfig
 from khoj.processor.embeddings import EmbeddingsModel
 from khoj.processor.tools.online_search import (
     read_webpage_at_url,
@@ -85,6 +86,78 @@ def test_encode_docs_memory_leak():
     # If slope is positive memory utilization is increasing
     # Positive threshold of 2, from observing memory usage trend on MPS vs CPU device
     assert slope < 2, f"Memory leak suspected on {device}. Memory usage increased at ~{slope:.2f} MB per iteration"
+
+
+def test_embed_documents_openai_respects_configured_batch_size(monkeypatch):
+    # Arrange
+    call_sizes = []
+    docs = ["doc-1", "doc-2", "doc-3", "doc-4", "doc-5"]
+    embeddings_model = EmbeddingsModel(
+        model_name="text-embedding-3-small",
+        embeddings_inference_endpoint_type=SearchModelConfig.ApiType.OPENAI,
+        embeddings_batch_size=2,
+    )
+
+    def fake_embed_with_openai(batch_docs):
+        call_sizes.append(len(batch_docs))
+        return [[0.0] for _ in batch_docs]
+
+    monkeypatch.setattr(embeddings_model, "embed_with_openai", fake_embed_with_openai)
+
+    # Act
+    embeddings = embeddings_model.embed_documents(docs)
+
+    # Assert
+    assert call_sizes == [2, 2, 1]
+    assert len(embeddings) == len(docs)
+
+
+def test_embed_documents_openai_uses_env_batch_size(monkeypatch):
+    # Arrange
+    monkeypatch.setenv("KHOJ_EMBEDDINGS_BATCH_SIZE", "3")
+    call_sizes = []
+    docs = ["doc-1", "doc-2", "doc-3", "doc-4", "doc-5"]
+    embeddings_model = EmbeddingsModel(
+        model_name="text-embedding-3-small",
+        embeddings_inference_endpoint_type=SearchModelConfig.ApiType.OPENAI,
+    )
+
+    def fake_embed_with_openai(batch_docs):
+        call_sizes.append(len(batch_docs))
+        return [[0.0] for _ in batch_docs]
+
+    monkeypatch.setattr(embeddings_model, "embed_with_openai", fake_embed_with_openai)
+
+    # Act
+    embeddings = embeddings_model.embed_documents(docs)
+
+    # Assert
+    assert call_sizes == [3, 2]
+    assert len(embeddings) == len(docs)
+
+
+def test_embed_documents_openai_invalid_env_batch_size_falls_back_to_default(monkeypatch):
+    # Arrange
+    monkeypatch.setenv("KHOJ_EMBEDDINGS_BATCH_SIZE", "invalid")
+    docs = [f"doc-{idx}" for idx in range(1501)]
+    call_sizes = []
+    embeddings_model = EmbeddingsModel(
+        model_name="text-embedding-3-small",
+        embeddings_inference_endpoint_type=SearchModelConfig.ApiType.OPENAI,
+    )
+
+    def fake_embed_with_openai(batch_docs):
+        call_sizes.append(len(batch_docs))
+        return [[0.0] for _ in batch_docs]
+
+    monkeypatch.setattr(embeddings_model, "embed_with_openai", fake_embed_with_openai)
+
+    # Act
+    embeddings = embeddings_model.embed_documents(docs)
+
+    # Assert
+    assert call_sizes == [1000, 501]
+    assert len(embeddings) == len(docs)
 
 
 @pytest.mark.asyncio

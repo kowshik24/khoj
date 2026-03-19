@@ -479,7 +479,7 @@ function FileFilterComboBox(props: FileFilterComboBoxProps) {
                 setInputText("");
             } else {
                 setInputText(props.inputText);
-                if (props.allFiles.includes(props.inputText)) {
+                if (Array.isArray(props.allFiles) && props.allFiles.includes(props.inputText)) {
                     setValue(props.inputText);
                 }
             }
@@ -489,7 +489,7 @@ function FileFilterComboBox(props: FileFilterComboBoxProps) {
     }, [props.inputText]);
 
     useEffect(() => {
-        if (inputText && !props.allFiles.includes(inputText)) {
+        if (inputText && Array.isArray(props.allFiles) && !props.allFiles.includes(inputText)) {
             setNoMatchingFiles(true);
             setValue("");
         } else if (!inputText) {
@@ -532,7 +532,7 @@ function FileFilterComboBox(props: FileFilterComboBoxProps) {
                     <CommandList>
                         <CommandEmpty>No files found.</CommandEmpty>
                         <CommandGroup>
-                            {props.allFiles.map((file) => (
+                            {Array.isArray(props.allFiles) && props.allFiles.map((file) => (
                                 <CommandItem
                                     key={file}
                                     value={file}
@@ -590,12 +590,24 @@ export default function Search() {
                 "Content-Type": "application/json",
             },
         })
-            .then((response) => response.json())
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then((data) => {
-                setAllFiles(data);
+                // Ensure data is an array
+                if (Array.isArray(data)) {
+                    setAllFiles(data);
+                } else {
+                    console.error("API returned non-array data:", data);
+                    setAllFiles([]);
+                }
             })
             .catch((error) => {
                 console.error("Error loading files:", error);
+                setAllFiles([]);
             });
     }, []);
 

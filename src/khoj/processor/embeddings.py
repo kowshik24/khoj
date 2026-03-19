@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List
 from urllib.parse import urlparse
 
@@ -26,6 +27,8 @@ from khoj.utils.helpers import (
 from khoj.utils.rawconfig import SearchResponse
 
 logger = logging.getLogger(__name__)
+DEFAULT_EMBEDDINGS_BATCH_SIZE = 1000
+EMBEDDINGS_BATCH_SIZE_ENV_VAR = "KHOJ_EMBEDDINGS_BATCH_SIZE"
 
 
 class EmbeddingsModel:
@@ -35,6 +38,7 @@ class EmbeddingsModel:
         embeddings_inference_endpoint: str = None,
         embeddings_inference_endpoint_api_key: str = None,
         embeddings_inference_endpoint_type=SearchModelConfig.ApiType.LOCAL,
+        embeddings_batch_size: int = None,
         query_encode_kwargs: dict = {},
         docs_encode_kwargs: dict = {},
         model_kwargs: dict = {},
@@ -48,9 +52,45 @@ class EmbeddingsModel:
         self.inference_endpoint = embeddings_inference_endpoint
         self.api_key = embeddings_inference_endpoint_api_key
         self.inference_endpoint_type = embeddings_inference_endpoint_type
+        self.embedding_batch_size = self.resolve_embedding_batch_size(embeddings_batch_size)
         if self.inference_endpoint_type == SearchModelConfig.ApiType.LOCAL:
             with timer(f"Loaded embedding model {self.model_name}", logger):
                 self.embeddings_model = SentenceTransformer(self.model_name, **self.model_kwargs)
+
+    @staticmethod
+    def parse_embedding_batch_size(value, source: str) -> int:
+        if value is None:
+            return None
+        try:
+            parsed_value = int(value)
+        except (TypeError, ValueError):
+            logger.warning(
+                f"Ignoring invalid embedding batch size from {source}: {value}. "
+                f"Using default {DEFAULT_EMBEDDINGS_BATCH_SIZE}."
+            )
+            return None
+        if parsed_value <= 0:
+            logger.warning(
+                f"Ignoring non-positive embedding batch size from {source}: {value}. "
+                f"Using default {DEFAULT_EMBEDDINGS_BATCH_SIZE}."
+            )
+            return None
+        return parsed_value
+
+    def resolve_embedding_batch_size(self, configured_batch_size: int) -> int:
+        model_batch_size = self.parse_embedding_batch_size(
+            configured_batch_size,
+            "SearchModelConfig.embeddings_batch_size",
+        )
+        if model_batch_size is not None:
+            return model_batch_size
+        env_batch_size = self.parse_embedding_batch_size(
+            os.getenv(EMBEDDINGS_BATCH_SIZE_ENV_VAR),
+            EMBEDDINGS_BATCH_SIZE_ENV_VAR,
+        )
+        if env_batch_size is not None:
+            return env_batch_size
+        return DEFAULT_EMBEDDINGS_BATCH_SIZE
 
     def embed_query(self, query):
         if self.inference_endpoint_type == SearchModelConfig.ApiType.HUGGINGFACE:
@@ -105,14 +145,14 @@ class EmbeddingsModel:
                 f"Unsupported inference endpoint: {self.inference_endpoint_type}. Generating embeddings locally instead."
             )
             return self.embeddings_model.encode(docs, **self.docs_encode_kwargs).tolist()
-        # break up the docs payload in chunks of 1000 to avoid hitting rate limits
+        # Break up docs payload into smaller chunks for compatibility with API batch limits.
         embeddings = []
         with tqdm.tqdm(total=len(docs)) as pbar:
-            for i in range(0, len(docs), 1000):
-                docs_to_embed = docs[i : i + 1000]
+            for i in range(0, len(docs), self.embedding_batch_size):
+                docs_to_embed = docs[i : i + self.embedding_batch_size]
                 generated_embeddings = embed_with_api(docs_to_embed)
                 embeddings += generated_embeddings
-                pbar.update(1000)
+                pbar.update(len(docs_to_embed))
         return embeddings
 
 

@@ -48,6 +48,8 @@ For each AI Model API you [add](http://localhost:42110/server/admin/database/aim
 
 ### Search Model Configs
 Search models are used to generate vector embeddings of your documents for natural language search and chat. You can choose any [embeddings models on HuggingFace](https://huggingface.co/models?pipeline_tag=sentence-similarity) to create vector embeddings of your documents for natural language search and chat.
+- `Embeddings batch size`: Optional. Controls how many documents Khoj sends per embeddings API request. Use this to match OpenAI-compatible providers that enforce smaller max batch sizes.
+- If `Embeddings batch size` is unset for a model, Khoj uses `KHOJ_EMBEDDINGS_BATCH_SIZE` (if set), else defaults to `1000`.
 
 <img src="/img/example_search_model_admin_settings.png" alt="Example Search Model Settings" style={{width: 500}} />
 

@@ -251,6 +251,7 @@ def configure_server(
                         model.embeddings_inference_endpoint,
                         model.embeddings_inference_endpoint_api_key,
                         model.embeddings_inference_endpoint_type,
+                        model.embeddings_batch_size,
                         query_encode_kwargs=model.bi_encoder_query_encode_config,
                         docs_encode_kwargs=model.bi_encoder_docs_encode_config,
                         model_kwargs=model.bi_encoder_model_config,
